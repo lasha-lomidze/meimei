@@ -46,14 +46,14 @@ for i in mapper:
 
 # Initialize the window explicitly before the loop
 blank_window = np.zeros((WINDOW_HEIGHT, WINDOW_WIDTH, 3), dtype=np.uint8)
-cv2.namedWindow("Toggle Window", cv2.WINDOW_NORMAL)
-cv2.resizeWindow("Toggle Window", WINDOW_WIDTH, WINDOW_HEIGHT)
+cv2.namedWindow("meimei", cv2.WINDOW_NORMAL)
+cv2.resizeWindow("meimei", WINDOW_WIDTH, WINDOW_HEIGHT)
 
 _active_gif_mode = None
 _gif_start_time = 0.0
 
 def show_window(image):
-    cv2.imshow("Toggle Window", image)
+    cv2.imshow("meimei", image)
 
 def display(body_language_mode):
     global _active_gif_mode, _gif_start_time

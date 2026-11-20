@@ -10,6 +10,7 @@ import meimei
 import expression_recognizer
 import pose_recognizer
 import utils
+# import tkinter as tk
 
 # =====================================================================
 # * General Configuration
@@ -17,9 +18,12 @@ import utils
 
 
 
+prev_scores = utils.prev_scores
 BodyLanguageMode = utils.BodyLanguageMode 
 MIN_CONFIDENCE_LEVEL_TO_CROSS = 0.4
 MIN_SUSPICIOUS_CONFIDENCE = 0.07 # special lower threshold for suspicious expressions
+WINDOW_WIDTH = 600
+WINDOW_HEIGHT = 600
 
 
 
@@ -68,9 +72,13 @@ face_detector = FaceDetector.create_from_options(face_detector_options)
 # =====================================================================
 
 
+
 prev_time = 0
 frame_timestamp_ms = 0
 cap = cv2.VideoCapture(0)
+cv2.namedWindow("Webcam")
+utils.center_windows()
+
 
 if not cap.isOpened():
     print("Error: Could not open video capture.")
@@ -85,7 +93,9 @@ try:
             break
 
         frame = cv2.flip(frame, 1) # flip the camera because it is inverted
-        frame = cv2.resize(frame, (480, 480))
+        frame = cv2.resize(frame, (WINDOW_WIDTH, WINDOW_HEIGHT))
+
+        
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # convert the frame to RGB for Mediapipe
 
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
@@ -104,6 +114,8 @@ try:
             gesture_scores = gesture_recognizer.get_gesture_confidence_scores(result.left_hand_landmarks)
             expression_scores = expression_recognizer.get_expression_confidence_scores(result.face_blendshapes)
             pose_scores = pose_recognizer.get_pose_confidence_scores(result.pose_landmarks)
+            prev_scores.pop(0)
+            prev_scores.append([*gesture_scores, *expression_scores, *pose_scores])
 
             # detech if there are two open palms
             if result.left_hand_landmarks and result.right_hand_landmarks:
