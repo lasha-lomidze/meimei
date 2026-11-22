@@ -1,18 +1,27 @@
-import stabilizer
+import head_tilt_analyzer
 import utils
+import math
 
 BodyLanguageMode = utils.BodyLanguageMode
+HeadTilt = utils.HeadTilt
+_base = {"w": None, "n": 0}
 
-def get_face_confidence_scores(face_blendshapes):
+def get_face_confidence_scores(face_blendshapes, face_landmarks):
     if not face_blendshapes:
         return []
 
     face_confidence_scores = []
+    v = head_tilt_analyzer.head_pitch_value(face_landmarks)   # e.g. 0.42
+    label = head_tilt_analyzer.head_pitch_label(v)  # e.g. HeadTilt.SLIGHT_DOWN
 
     # ^ ============================================ SMILE
-    smile_left = face_blendshapes[44].score
-    smile_right = face_blendshapes[45].score
-    smile_confidence = ((smile_left + smile_right) / 2) 
+    d = lambda a, b: math.hypot(face_landmarks[a].x - face_landmarks[b].x, face_landmarks[a].y - face_landmarks[b].y)
+    w = d(61, 291) / d(234, 454)                      # mouth width / face width
+    if _base["n"] < 60:                               # first ~2 s: learn your neutral width (keep a neutral face)
+        _base["w"] = w if _base["w"] is None else (_base["w"] * _base["n"] + w) / (_base["n"] + 1)
+        _base["n"] += 1
+    smile_confidence = min(max((w / _base["w"] - 1.01) / 0.10, 0.0), 1.0)
+    
 
 
     # ^ ============================================ CLOSED EYES
@@ -40,6 +49,7 @@ def get_face_confidence_scores(face_blendshapes):
     right_brow_signal = (max(up_diff, 0.0) + max(down_diff, 0.0)) / 2.0
     left_brow_signal = (max(-up_diff, 0.0) + max(-down_diff, 0.0)) / 2.0
     suspicious_confidence = max(right_brow_signal, left_brow_signal) 
+    if label != HeadTilt.NEUTRAL: suspicious_confidence *= 1.2
 
 
 
@@ -56,6 +66,8 @@ def get_face_confidence_scores(face_blendshapes):
         + nose_sneer_left
         + nose_sneer_right
     ) * 1.7
+    if label == HeadTilt.SLIGHT_DOWN or label == HeadTilt.DOWN: angry_confidence *= 1.3
+    if label == HeadTilt.SLIGHT_UP or label == HeadTilt.UP: angry_confidence *= 0.9
 
 
     # ^ ============================================ SAD
@@ -63,6 +75,10 @@ def get_face_confidence_scores(face_blendshapes):
     mouth_frown_left = face_blendshapes[36].score
     mouth_frown_right = face_blendshapes[37].score
     sad_confidence = (brow_inner_up > 0.91) / 2 + mouth_frown_left + mouth_frown_right
+    if label == HeadTilt.SLIGHT_UP: sad_confidence *= 1.2
+    if label == HeadTilt.UP: sad_confidence *= 1.1
+    if label == HeadTilt.SLIGHT_DOWN: sad_confidence *= 0.9
+    if label == HeadTilt.DOWN: sad_confidence *= 0.8
 
 
     
