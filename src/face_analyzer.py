@@ -20,7 +20,7 @@ def get_face_confidence_scores(face_blendshapes):
     eyeSquintRight = face_blendshapes[20].score
     raw_average = (eyeSquintLeft + eyeSquintRight) / 2
     balance_factor = min(eyeSquintLeft, eyeSquintRight) / (max(eyeSquintLeft, eyeSquintRight) + 1e-6)  # Find how close they are to being equally closed (0.0 to 1.0)
-    closed_eyes_confidence = raw_average * balance_factor
+    closed_eyes_confidence = (raw_average * balance_factor) 
 
 
     # ^ ============================================ SIDE EYE
@@ -62,7 +62,7 @@ def get_face_confidence_scores(face_blendshapes):
     brow_inner_up = face_blendshapes[3].score
     mouth_frown_left = face_blendshapes[36].score
     mouth_frown_right = face_blendshapes[37].score
-    sad_confidence = (brow_inner_up > 0.93) / 2 + mouth_frown_left + mouth_frown_right
+    sad_confidence = (brow_inner_up > 0.91) / 2 + mouth_frown_left + mouth_frown_right
 
 
     
@@ -75,6 +75,7 @@ def get_face_confidence_scores(face_blendshapes):
         {"mode": BodyLanguageMode.ANGRY, "score": angry_confidence},
         {"mode": BodyLanguageMode.SAD, "score": sad_confidence},
     ]
-    
+
+    print(face_confidence_scores)
     return face_confidence_scores
 

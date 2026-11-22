@@ -47,7 +47,7 @@ VisionRunningMode = mp.tasks.vision.RunningMode
 options = HolisticLandmarkerOptions(
     base_options=BaseOptions(model_asset_path="tasks/holistic_landmarker.task"),
     running_mode=VisionRunningMode.VIDEO,
-    min_face_detection_confidence=0.8,
+    min_face_detection_confidence=0.5,
     min_pose_detection_confidence=0.5,
     output_face_blendshapes=True
 )
@@ -101,10 +101,10 @@ try:
         frame_timestamp_ms += 33
 
         face_result = face_detector.detect_for_video(mp_image, frame_timestamp_ms)
-        if len(face_result.detections) == 2:
+        if len(face_result.detections) == 2: 
             pose_analyzer.reset_motion_history()
             meimei.display(BodyLanguageMode.TWO_PEOPLE)
-        elif len(face_result.detections) > 2:
+        if len(face_result.detections) > 2:
             pose_analyzer.reset_motion_history()
             meimei.display(BodyLanguageMode.MULTIPLE_PEOPLE)
         else:
@@ -112,6 +112,7 @@ try:
 
             gesture_scores = hand_analyzer.get_hand_confidence_scores(result.left_hand_landmarks)
             expression_scores = face_analyzer.get_face_confidence_scores(result.face_blendshapes)
+            print(expression_scores)
             pose_scores = pose_analyzer.get_pose_confidence_scores(result.pose_landmarks)
 
             # detech if there are two open palms

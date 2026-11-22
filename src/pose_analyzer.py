@@ -1,4 +1,4 @@
-from collections import deque
+from collections import deque, namedtuple
 import math
 import utils
 
@@ -7,7 +7,10 @@ BodyLanguageMode = utils.BodyLanguageMode
 _MOTION_HISTORY_SIZE = 18
 _JITTER_DEADZONE = 0.012
 _TELEPORT_THRESHOLD = 0.6
+_MIN_VIS = 0.6  # minimum landmark visibility for the SECRET check
 _motion_history = deque(maxlen=_MOTION_HISTORY_SIZE)
+
+_Point = namedtuple("_Point", "x y")
 
 
 def reset_motion_history():
@@ -20,6 +23,15 @@ def _dist_2d(a, b):
 
 def _clamp(value, min_val=0.0, max_val=1.0):
     return max(min_val, min(max_val, value))
+
+
+def _ramp(value, lo, hi):
+    """0 at lo, 1 at hi, linear in between."""
+    return _clamp((value - lo) / (hi - lo))
+
+
+def _visible(*pts):
+    return all(getattr(p, "visibility", 1.0) >= _MIN_VIS for p in pts)
 
 
 def _elbow_angle_deg(shoulder, elbow, wrist):
@@ -38,17 +50,17 @@ def _hand_to_head_score(pose_landmarks, shoulder_idx, elbow_idx, wrist_idx, pink
     pinky = pose_landmarks[pinky_idx]
     index = pose_landmarks[index_idx]
 
-    hand_mid_x = (pinky.x + index.x) / 2.0
-    hand_mid_y = (pinky.y + index.y) / 2.0
+    # Occluded or guessed arm landmarks -> no score
+    if not _visible(shoulder, elbow, wrist):
+        return 0.0
 
-    class _Point:
-        def __init__(self, x, y):
-            self.x = x
-            self.y = y
+    if _visible(pinky, index):
+        hand_mid = _Point((pinky.x + index.x) / 2.0, (pinky.y + index.y) / 2.0)
+    else:
+        hand_mid = wrist
 
-    hand_mid = _Point(hand_mid_x, hand_mid_y)
-
-    # 1. Proximity of wrist / hand to ears or upper-back of head
+    # 1. Proximity of wrist / hand to ears or top of head
+    #    Full score at <= 0.6 head-widths, zero at >= 1.0
     min_head_dist = min(
         _dist_2d(wrist, left_ear),
         _dist_2d(wrist, right_ear),
@@ -57,20 +69,21 @@ def _hand_to_head_score(pose_landmarks, shoulder_idx, elbow_idx, wrist_idx, pink
         _dist_2d(hand_mid, head_top),
         _dist_2d(wrist, head_top),
     )
-    norm_dist = min_head_dist / head_scale
-    proximity_score = _clamp(1.0 - (norm_dist - 0.5) / 0.8)
+    proximity_score = 1.0 - _ramp(min_head_dist / head_scale, 0.6, 1.0)
 
-    # 2. Elevation: hand should be raised above shoulder toward ear/head level
+    # 2. Elevation: hand must reach ear level or above
+    #    Starts at 0.85, full at 1.05 (ratio 1.0 = ear height)
     ear_y = (left_ear.y + right_ear.y) / 2.0
-    hand_y = min(wrist.y, hand_mid_y)
+    hand_y = min(wrist.y, hand_mid.y)
     elevation_ratio = (shoulder.y - hand_y) / (abs(shoulder.y - ear_y) + 1e-4)
-    elevation_score = _clamp(elevation_ratio / 0.85)
+    elevation_score = _ramp(elevation_ratio, 0.85, 1.05)
 
     # 3. Elbow bend: hand behind/on head requires a bent elbow
     angle_deg = _elbow_angle_deg(shoulder, elbow, wrist)
     bend_score = _clamp((135.0 - angle_deg) / 55.0)
 
-    return (proximity_score * elevation_score * bend_score) ** (1.0 / 3.0)
+    # min instead of geometric mean: one weak factor can't be hidden by the others
+    return min(proximity_score, elevation_score, bend_score)
 
 
 def _dancing_score(pose_landmarks, shoulder_dist):
@@ -144,24 +157,23 @@ def get_pose_confidence_scores(pose_landmarks):
     shoulder_dist = _dist_2d(left_shoulder, right_shoulder)
     head_scale = max(ear_dist, shoulder_dist * 0.4, 1e-4)
 
-    class _Point:
-        def __init__(self, x, y):
-            self.x = x
-            self.y = y
-
     head_top = _Point(
         (left_ear.x + right_ear.x) / 2.0,
         min(left_ear.y, right_ear.y) - 0.35 * head_scale,
     )
 
-    # ^ ============================================ SECRET 
-    left_arm_score = _hand_to_head_score(
-        pose_landmarks, 11, 13, 15, 17, 19, head_scale, left_ear, right_ear, head_top
-    )
-    right_arm_score = _hand_to_head_score(
-        pose_landmarks, 12, 14, 16, 18, 20, head_scale, left_ear, right_ear, head_top
-    )
-    secret_confidence = max(left_arm_score, right_arm_score)
+    # ^ ============================================ SECRET
+    # Skip if either ear is occluded/guessed (e.g. head turned): head_scale and head_top become unreliable
+    if _visible(left_ear, right_ear):
+        left_arm_score = _hand_to_head_score(
+            pose_landmarks, 11, 13, 15, 17, 19, head_scale, left_ear, right_ear, head_top
+        )
+        right_arm_score = _hand_to_head_score(
+            pose_landmarks, 12, 14, 16, 18, 20, head_scale, left_ear, right_ear, head_top
+        )
+        secret_confidence = max(left_arm_score, right_arm_score)
+    else:
+        secret_confidence = 0.0
 
     # ^ ============================================ DANCING
     dancing_confidence = _dancing_score(pose_landmarks, max(shoulder_dist, 1e-4))
@@ -173,5 +185,3 @@ def get_pose_confidence_scores(pose_landmarks):
     ]
 
     return pose_confidence_scores
-
-
