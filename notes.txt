@@ -3,6 +3,8 @@ Smooth the choice over a short window—such as requiring the same expression fo
 for expressions that heavly conflict and overlap maybe add some specific pluses for example head tilts (example: down tilt for angry, up tilt for sad)
 
 
+current idea for stabilizer: for showing an expression or changing it we look at previous frames and based on 
+confidence levels of those we decide the final outcome.         
 
 
 

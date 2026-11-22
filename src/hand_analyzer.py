@@ -4,11 +4,11 @@ import utils
 BodyLanguageMode = utils.BodyLanguageMode
 
 
-def get_gesture_confidence_scores(hand_landmarks):
+def get_hand_confidence_scores(hand_landmarks):
     if not hand_landmarks:
         return []
 
-    gesture_confidence_scores = []
+    hand_confidence_scores = []
 
 
     # ^ ============================================ FINGER EXTENSION
@@ -73,10 +73,10 @@ def get_gesture_confidence_scores(hand_landmarks):
 
 
     # ^ ============================================ RETURN VALUES
-    gesture_confidence_scores = [
-        {"gesture": BodyLanguageMode.OPEN_PALM, "score": open_palm_confidence},
-        {"gesture": BodyLanguageMode.FIST, "score": fist_confidence},
-        {"gesture": BodyLanguageMode.MIDDLE_FINGER, "score": middle_finger_confidence},
+    hand_confidence_scores = [
+        {"mode": BodyLanguageMode.OPEN_PALM, "score": open_palm_confidence},
+        {"mode": BodyLanguageMode.FIST, "score": fist_confidence},
+        {"mode": BodyLanguageMode.MIDDLE_FINGER, "score": middle_finger_confidence},
     ]
 
-    return gesture_confidence_scores
+    return hand_confidence_scores

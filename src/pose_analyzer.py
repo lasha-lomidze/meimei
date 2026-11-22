@@ -168,8 +168,8 @@ def get_pose_confidence_scores(pose_landmarks):
 
     # ^ ============================================ RETURN VALUES
     pose_confidence_scores = [
-        {"gesture": BodyLanguageMode.SECRET, "score": secret_confidence},
-        {"gesture": BodyLanguageMode.DANCING, "score": dancing_confidence},
+        {"mode": BodyLanguageMode.SECRET, "score": secret_confidence},
+        {"mode": BodyLanguageMode.DANCING, "score": dancing_confidence},
     ]
 
     return pose_confidence_scores

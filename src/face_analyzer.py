@@ -1,12 +1,13 @@
+import stabilizer
 import utils
 
 BodyLanguageMode = utils.BodyLanguageMode
 
-def get_expression_confidence_scores(face_blendshapes):
+def get_face_confidence_scores(face_blendshapes):
     if not face_blendshapes:
         return []
 
-    expression_confidence_scores = []
+    face_confidence_scores = []
 
     # ^ ============================================ SMILE
     smile_left = face_blendshapes[44].score
@@ -54,26 +55,26 @@ def get_expression_confidence_scores(face_blendshapes):
         + cheek_puff * 3
         + nose_sneer_left
         + nose_sneer_right
-    ) * 1.5
+    ) * 1.7
 
 
     # ^ ============================================ SAD
     brow_inner_up = face_blendshapes[3].score
     mouth_frown_left = face_blendshapes[36].score
     mouth_frown_right = face_blendshapes[37].score
-    sad_confidence = (brow_inner_up / 2.0 + mouth_frown_left / 2.0 + mouth_frown_right / 2.0) 
+    sad_confidence = (brow_inner_up > 0.93) / 2 + mouth_frown_left + mouth_frown_right
 
 
     
     # ^ ============================================ RETURN VALUES
-    expression_confidence_scores = [
-        {"gesture": BodyLanguageMode.SMILE, "score": smile_confidence},
-        {"gesture": BodyLanguageMode.CLOSED_EYES, "score": closed_eyes_confidence},
-        {"gesture": BodyLanguageMode.SIDE_EYE, "score": side_eye_confidence},
-        {"gesture": BodyLanguageMode.SUSPICIOUS, "score": suspicious_confidence},
-        {"gesture": BodyLanguageMode.ANGRY, "score": angry_confidence},
-        {"gesture": BodyLanguageMode.SAD, "score": sad_confidence},
+    face_confidence_scores = [
+        {"mode": BodyLanguageMode.SMILE, "score": smile_confidence},
+        {"mode": BodyLanguageMode.CLOSED_EYES, "score": closed_eyes_confidence},
+        {"mode": BodyLanguageMode.SIDE_EYE, "score": side_eye_confidence},
+        {"mode": BodyLanguageMode.SUSPICIOUS, "score": suspicious_confidence},
+        {"mode": BodyLanguageMode.ANGRY, "score": angry_confidence},
+        {"mode": BodyLanguageMode.SAD, "score": sad_confidence},
     ]
     
-    return expression_confidence_scores
+    return face_confidence_scores
 

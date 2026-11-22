@@ -1,16 +1,16 @@
-from ast import expr
-
 import mediapipe as mp
 import cv2
 import os
 import sys
 import zipfile
-import gesture_recognizer
+import hand_analyzer
 import meimei
-import expression_recognizer
-import pose_recognizer
+import face_analyzer
+import pose_analyzer
 import utils
-# import tkinter as tk
+import stabilizer
+
+
 
 # =====================================================================
 # * General Configuration
@@ -18,12 +18,11 @@ import utils
 
 
 
-prev_scores = utils.prev_scores
 BodyLanguageMode = utils.BodyLanguageMode 
-MIN_CONFIDENCE_LEVEL_TO_CROSS = 0.4
-MIN_SUSPICIOUS_CONFIDENCE = 0.07 # special lower threshold for suspicious expressions
 WINDOW_WIDTH = 600
 WINDOW_HEIGHT = 600
+stabilizer_instance = stabilizer.Stabilizer()
+prev_scores = stabilizer_instance.prev_scores
 
 
 
@@ -48,7 +47,7 @@ VisionRunningMode = mp.tasks.vision.RunningMode
 options = HolisticLandmarkerOptions(
     base_options=BaseOptions(model_asset_path="tasks/holistic_landmarker.task"),
     running_mode=VisionRunningMode.VIDEO,
-    min_face_detection_confidence=0.5,
+    min_face_detection_confidence=0.8,
     min_pose_detection_confidence=0.5,
     output_face_blendshapes=True
 )
@@ -103,54 +102,33 @@ try:
 
         face_result = face_detector.detect_for_video(mp_image, frame_timestamp_ms)
         if len(face_result.detections) == 2:
-            pose_recognizer.reset_motion_history()
+            pose_analyzer.reset_motion_history()
             meimei.display(BodyLanguageMode.TWO_PEOPLE)
         elif len(face_result.detections) > 2:
-            pose_recognizer.reset_motion_history()
+            pose_analyzer.reset_motion_history()
             meimei.display(BodyLanguageMode.MULTIPLE_PEOPLE)
         else:
             result = landmarker.detect_for_video(mp_image, frame_timestamp_ms)
 
-            gesture_scores = gesture_recognizer.get_gesture_confidence_scores(result.left_hand_landmarks)
-            expression_scores = expression_recognizer.get_expression_confidence_scores(result.face_blendshapes)
-            pose_scores = pose_recognizer.get_pose_confidence_scores(result.pose_landmarks)
-            prev_scores.pop(0)
-            prev_scores.append([*gesture_scores, *expression_scores, *pose_scores])
+            gesture_scores = hand_analyzer.get_hand_confidence_scores(result.left_hand_landmarks)
+            expression_scores = face_analyzer.get_face_confidence_scores(result.face_blendshapes)
+            pose_scores = pose_analyzer.get_pose_confidence_scores(result.pose_landmarks)
 
             # detech if there are two open palms
             if result.left_hand_landmarks and result.right_hand_landmarks:
-                left_hand_score = gesture_recognizer.get_gesture_confidence_scores(result.left_hand_landmarks)
-                right_hand_score = gesture_recognizer.get_gesture_confidence_scores(result.right_hand_landmarks)
+                left_hand_score = hand_analyzer.get_hand_confidence_scores(result.left_hand_landmarks)
+                right_hand_score = hand_analyzer.get_hand_confidence_scores(result.right_hand_landmarks)
                 if left_hand_score and right_hand_score:
                     # Only consider it as TWO_OPEN_PALMS if both hands have a high confidence for OPEN_PALM
-                    if left_hand_score[0]["gesture"] == BodyLanguageMode.OPEN_PALM and right_hand_score[0]["gesture"] == BodyLanguageMode.OPEN_PALM:
+                    if left_hand_score[0]["mode"] == BodyLanguageMode.OPEN_PALM and right_hand_score[0]["mode"] == BodyLanguageMode.OPEN_PALM:
                         # make OpenaPalm (single hand) score 0.0 so it doesnt interfere
-                        gesture_scores = [score for score in gesture_scores if score["gesture"] != BodyLanguageMode.OPEN_PALM]
-                        gesture_scores.append({"gesture": BodyLanguageMode.TWO_OPEN_PALMS, "score": min(left_hand_score[0]["score"], right_hand_score[0]["score"])})
+                        gesture_scores = [score for score in gesture_scores if score["mode"] != BodyLanguageMode.OPEN_PALM]
+                        gesture_scores.append({"mode": BodyLanguageMode.TWO_OPEN_PALMS, "score": min(left_hand_score[0]["score"], right_hand_score[0]["score"])})
 
-            # Safely find the highest items, defaulting to None if the lists are empty
-            highest_confidence_gesture = max(gesture_scores, key=lambda x: x["score"]) if gesture_scores else None
-            highest_confidence_expression = max(expression_scores, key=lambda x: x["score"]) if expression_scores else None  # Fixed bug here
-            highest_confidence_pose = max(pose_scores, key=lambda x: x["score"]) if pose_scores else None
-
-            # Handle the edge case by swapping None values with a safe tracking fallback object
-            default_blank = {"gesture": BodyLanguageMode.UNKNOWN, "score": 0.0}
-            gesture_item = highest_confidence_gesture if highest_confidence_gesture else default_blank
-            expression_item = highest_confidence_expression if highest_confidence_expression else default_blank
-            pose_item = highest_confidence_pose if highest_confidence_pose else default_blank
-
-            highest_confidence_body_language = max([gesture_item, expression_item, pose_item], key=lambda x: x["score"])
-
-            confidence_threshold = (
-                MIN_SUSPICIOUS_CONFIDENCE
-                if highest_confidence_body_language["gesture"] is BodyLanguageMode.SUSPICIOUS
-                else MIN_CONFIDENCE_LEVEL_TO_CROSS
-            )
-            meimei.display(
-                highest_confidence_body_language["gesture"]
-                if highest_confidence_body_language["score"] > confidence_threshold
-                else BodyLanguageMode.UNKNOWN
-            )
+            stabilizer_instance.append_scores([*gesture_scores, *expression_scores, *pose_scores])
+            final_mode = stabilizer_instance.get_stable_mode()
+        
+            meimei.display(final_mode)
 
         cv2.imshow("Webcam", frame)
         if cv2.waitKey(1) & 0xFF == ord("q"):
