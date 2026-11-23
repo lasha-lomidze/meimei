@@ -59,7 +59,7 @@ Built using **MediaPipe**, **OpenCV**, and custom heuristic stabilization algori
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/<your-username>/meimei.git
+git clone https://github.com/lasha-lomidze/meimei.git
 cd meimei
 ```
 
